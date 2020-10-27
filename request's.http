@@ -9,7 +9,7 @@ content-type: application/json
 	"longitude": -43.365895,
 	"city": "Rio de janeiro",
 	"uf": "RJ",
-	"items": [1,2,10]
+	"items": [9,21,10]
 }
 
 ###

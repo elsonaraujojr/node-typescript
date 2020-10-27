@@ -24,9 +24,8 @@ locationsRoutes.post('/', async (request, response) => {
   const location_id = newIds[0];
 
   const locationItems = items.map((item_id: number) => {
-    const selectedItem = transaction('items').select('id', item_id).first();
-    if (!selectedItem) {
-      return response.status(400).json({ message: 'Item not found!' });
+    if (!transaction('items').where('id', item_id).first()) {
+      return response.status(400).json({ message: 'Item not found.' });
     }
     return {
       item_id,
