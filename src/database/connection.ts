@@ -1,6 +1,12 @@
 import Knex from "knex";
+import path from 'path';
 
 const connection = Knex({
-  client: "pg",
-  // http://knexjs.org/
+  client: 'sqlite3',
+  connection: {
+    filename: path.resolve(__dirname, 'databese.sqlite'),
+  },
+  useNullAsDefault: true,
 });
+
+export default connection;

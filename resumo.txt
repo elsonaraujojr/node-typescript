@@ -1,0 +1,4 @@
+short sintaxe, referência o mesmo nome do campo do banco de dados, que está na tabela.
+
+transaction knex: Tudo que estiver entre a const transaction e transaction.commit, é considerado como uma única operação. Se houver falar a transaction é desfeita. No lugar do knex nos insert's tem que por o transaction para referênciar que os dois insert será uma única operação!
+
