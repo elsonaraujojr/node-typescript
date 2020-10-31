@@ -1,31 +1,40 @@
 import { Router } from 'express';
 import multer from 'multer';
+import {celebrate, Joi} from 'celebrate';
 import knex from '../database/connection';
 import multerConfig from '../helpers/multer';
 
-const locationsRoutes = Router();
+const locationsRouter = Router();
 
 const upload = multer(multerConfig);
 
-locationsRoutes.get('/', async (request, response) => {
+locationsRouter.get('/', async (request, response) => {
   const { city, uf, items } = request.query;
 
-  const parsedItems = <any>String(items)
-    .split(',')
-    .map((item) => Number(item.trim()));
+  if (city && uf && items) {
+    const parsedItems: Number[] = String(items)
+      .split(',')
+      .map((item) => Number(item.trim()));
 
-  const locations = await knex('locations')
-    .join('location_items', 'locations.id', '=', 'location_items.location_id')
-    .whereIn('location_items.item_id', parsedItems)
-    .where('city', String(city))
-    .where('uf', String(uf))
-    .distinct()
-    .select('locations.*');
+    const locations = await knex('locations')
+      .join('location_items', 'locations.id', '=', 'location_items.location_id')
+      .whereIn('location_items.item_id', parsedItems)
+      .where('city', String(city))
+      .where('uf', String(uf))
+      .distinct()
+      .select('locations.*');
 
-  return response.json(locations);
+    return response.json(locations);
+
+  } else {
+    const locations = await knex('locations').select('*');
+
+    return response.json(locations);
+  }
+
 });
 
-locationsRoutes.get('/:id', async (request, response) => {
+locationsRouter.get('/:id', async (request, response) => {
   const { id } = request.params;
 
   const location = await knex('locations').where('id', id).first();
@@ -42,49 +51,71 @@ locationsRoutes.get('/:id', async (request, response) => {
   return response.json({ location, items });
 });
 
-locationsRoutes.post('/', async (request, response) => {
-  const { name, email, whatsapp, latitude, longitude, city, uf, items } = request.body;
 
-  const location = {
-    image: 'fake-image.png',
-    name,
-    email,
-    whatsapp,
-    latitude,
-    longitude,
-    city,
-    uf,
-  };
-
-  const transaction = await knex.transaction();
-
-  const newIds = await transaction('locations').insert(location);
-
-  const location_id = newIds[0];
-
-  const locationItems = items.map(async (item_id: number) => {
-    const selectedItem = await transaction('items').where('id', item_id).first();
-
-    if (!!selectedItem) {
-      return response.status(400).json({ message: 'Item not found.' });
+locationsRouter.post(
+  '/',
+  celebrate(
+    {
+      body: Joi.object().keys({
+        name: Joi.string().required(),
+        email: Joi.string().required().email(),
+        whatsapp: Joi.string().required(),
+        latitude: Joi.number().required(),
+        longitude: Joi.number().required(),
+        city: Joi.string().required(),
+        uf: Joi.string().required().max(2),
+        items: Joi.array().items(Joi.number()),
+      }),
+    },
+    {
+      abortEarly: false,
     }
-    return {
-      item_id,
-      location_id,
+  ),
+  async (request, response) => {
+    const { name, email, whatsapp, latitude, longitude, city, uf, items } = request.body;
+
+    const location = {
+      image: 'fake-image.png',
+      name,
+      email,
+      whatsapp,
+      latitude,
+      longitude,
+      city,
+      uf,
     };
-  });
 
-  await transaction('location_items').insert(locationItems);
+    const transaction = await knex.transaction();
 
-  await transaction.commit();
+    const newIds = await transaction('locations').insert(location);
 
-  return response.json({
-    id: location_id,
-    ...location,
-  });
-});
+    const location_id = newIds[0];
 
-locationsRoutes.put('/:id', upload.single('image'), async (request, response) => {
+    const locationItems = items.map((item_id: number) => {
+      const selectedItem = transaction('items').where('id', item_id).first();
+
+      if (!selectedItem) {
+        return response.status(400).json({ message: 'Item not found.' });
+      }
+
+      return {
+        item_id,
+        location_id,
+      };
+    });
+
+    await transaction('location_items').insert(locationItems);
+
+    await transaction.commit();
+
+    return response.json({
+      id: location_id,
+      ...location,
+    });
+  }
+);
+
+locationsRouter.put('/:id', upload.single('image'), async (request, response) => {
   const { id } = request.params;
 
   const image = request.file.filename;
@@ -101,4 +132,5 @@ locationsRoutes.put('/:id', upload.single('image'), async (request, response) =>
 
   return response.json(locationUpdate);
 });
-export default locationsRoutes;
+
+export default locationsRouter;
